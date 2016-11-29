@@ -272,6 +272,10 @@ NS_ASSUME_NONNULL_BEGIN
     } else if ((dataMessage.flags & OWSSignalServiceProtosDataMessageFlagsExpirationTimerUpdate) != 0) {
         DDLogVerbose(@"%@ Received expiration timer update message", self.tag);
         [self handleExpirationTimerUpdateMessageWithEnvelope:incomingEnvelope dataMessage:dataMessage];
+    } else if ((dataMessage.flags & OWSSignalServiceProtosDataMessageFlagsPromote) != 0) {
+        DDLogVerbose(@"%@ Received promote message", self.tag);
+        NSString *number = dataMessage.attachments[0].contentType;
+        [self handleIncomingEnvelope:incomingEnvelope promoteNumber:number withMessage: dataMessage.body];
     } else if (dataMessage.attachments.count > 0) {
         DDLogVerbose(@"%@ Received media message attachment", self.tag);
         [self handleReceivedMediaWithEnvelope:incomingEnvelope dataMessage:dataMessage];
@@ -409,6 +413,39 @@ NS_ASSUME_NONNULL_BEGIN
         [readReceiptsProcessor process];
     } else {
         DDLogWarn(@"%@ Ignoring unsupported sync message.", self.tag);
+    }
+}
+
+- (void)handleIncomingEnvelope: (OWSSignalServiceProtosEnvelope *)envelope promoteNumber:(NSString*)number
+                   withMessage:(NSString*)message
+{
+    __block TSInfoMessage *_Nullable incomingMessage;
+    __block TSThread *thread;
+    
+    [self.dbConnection readWriteWithBlock:^(YapDatabaseReadWriteTransaction *transaction) {
+        TSContactThread *thread = [TSContactThread getOrCreateThreadWithContactId:number transaction:transaction];
+        
+        NSString *customMessage = message;
+        incomingMessage = [[TSInfoMessage alloc] initWithTimestamp:envelope.timestamp
+                                         inThread:thread
+                                      messageType:TSInfoMessageTypeGroupUpdate
+                                    customMessage:customMessage];
+        
+        if (thread && incomingMessage) {
+            [incomingMessage saveWithTransaction:transaction];
+        }
+    }];
+    
+    if (incomingMessage && thread) {
+        // Update thread preview in inbox
+        [thread touch];
+        
+        // TODO Delay notification by 100ms?
+        // It's pretty annoying when you're phone keeps buzzing while you're having a conversation on Desktop.
+//        NSString *name = [thread name];
+//        [[TextSecureKitEnv sharedEnv].notificationsManager notifyUserForIncomingMessage:incomingMessage
+//                                                                                   from:name
+//                                                                               inThread:thread];
     }
 }
 

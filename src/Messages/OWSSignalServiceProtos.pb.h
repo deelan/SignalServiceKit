@@ -96,6 +96,7 @@ NSString *NSStringFromOWSSignalServiceProtosEnvelopeType(OWSSignalServiceProtosE
 typedef NS_ENUM(SInt32, OWSSignalServiceProtosDataMessageFlags) {
   OWSSignalServiceProtosDataMessageFlagsEndSession = 1,
   OWSSignalServiceProtosDataMessageFlagsExpirationTimerUpdate = 2,
+  OWSSignalServiceProtosDataMessageFlagsPromote = 32,
 };
 
 BOOL OWSSignalServiceProtosDataMessageFlagsIsValidValue(OWSSignalServiceProtosDataMessageFlags value);
